@@ -130,20 +130,50 @@ class LeafNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(BaseTransaction transaction, DataBox key) {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+
+        return this;
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf(BaseTransaction transaction) {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        return this;
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Integer>> put(BaseTransaction transaction, DataBox key, RecordId rid)
     throws BPlusTreeException {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        Optional<Pair<DataBox, Integer>> res = Optional.empty();
+        if(!this.getKey(key).equals(Optional.empty())) throw new BPlusTreeException("Duplicated key");
+        int addIdx=this.keys.size();
+
+        for(int i = 0; i < this.keys.size(); i++){
+            if(key.compareTo(this.keys.get(i)) < 0){
+                addIdx = i;
+                break;
+            }
+        }
+        this.keys.add(addIdx, key);
+        this.rids.add(addIdx, rid);
+        //if overflow, split
+        if(this.keys.size() > this.metadata.getOrder()*2){
+
+            LeafNode leaf1 = new LeafNode(this.metadata, this.keys.subList(this.metadata.getOrder(), this.keys.size()),
+                                          this.rids.subList(this.metadata.getOrder(), this.rids.size()), Optional.empty(), transaction);
+            this.keys = this.keys.subList(0, this.metadata.getOrder());
+            this.rids = this.rids.subList(0, this.metadata.getOrder());
+            this.rightSibling = Optional.of(leaf1.getPage().getPageNum());
+            res = Optional.of(new Pair<>(leaf1.keys.get(0), leaf1.getPage().getPageNum()));
+
+        }
+
+        sync(transaction);
+        return res;
+
     }
 
     // See BPlusNode.bulkLoad.
@@ -152,13 +182,46 @@ class LeafNode extends BPlusNode {
             Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor)
     throws BPlusTreeException {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        Optional<Pair<DataBox, Integer>> res = Optional.empty();
+        int splitLen = (int) Math.ceil(2 * this.metadata.getOrder() * fillFactor) ;
+
+        DataBox key;
+        TreeMap sortedData = new TreeMap();
+        Pair<DataBox, RecordId> entry;
+        while (data.hasNext()){
+            entry = data.next();
+            if(sortedData.containsKey(entry.getFirst())) throw new BPlusTreeException("Duplicated key");
+            sortedData.put(entry.getFirst(), entry.getSecond());
+        }
+        Iterator sortedDataItr = sortedData.entrySet().iterator();
+        while (sortedDataItr.hasNext()){
+            Map.Entry ent = (Map.Entry)sortedDataItr.next();
+            if(this.keys.size() <= splitLen){
+                this.keys.add((DataBox) ent.getKey());
+                this.rids.add((RecordId) ent.getValue());
+            }else{
+                LeafNode leaf1 = new LeafNode(this.metadata, this.keys.subList(0, splitLen), this.rids.subList(0, splitLen), Optional.of(this.getPage().getPageNum()), transaction);
+                this.keys = new ArrayList<>();
+                this.rids = new ArrayList<>();
+                this.keys.add((DataBox) ent.getKey());
+                this.rids.add((RecordId) ent.getValue());
+                res = Optional.of(new Pair<>((DataBox) ent.getKey(), this.getPage().getPageNum()));
+            }
+        }
+        sync(transaction);
+        return res;
+
     }
 
     // See BPlusNode.remove.
     @Override
     public void remove(BaseTransaction transaction, DataBox key) {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        int idx = this.keys.indexOf(key);
+        this.keys.remove(idx);
+        this.rids.remove(idx);
+        sync(transaction);
     }
 
     // Iterators /////////////////////////////////////////////////////////////////
@@ -341,7 +404,23 @@ class LeafNode extends BPlusNode {
      */
     public static LeafNode fromBytes(BaseTransaction transaction, BPlusTreeMetadata metadata,
                                      int pageNum) {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        Page p = metadata.getAllocator().fetchPage(transaction, pageNum);
+        Buffer buf = p.getBuffer(transaction);
+
+        assert(buf.get() == (byte) 1);
+
+        List<DataBox> keys = new ArrayList<>();
+        List<RecordId> children = new ArrayList<>();
+
+        int rightSibling = buf.getInt();
+        int keySize = buf.getInt();
+        for (int i = 0; i < keySize; ++i) {
+            keys.add(DataBox.fromBytes(buf, metadata.getKeySchema()));
+            children.add(RecordId.fromBytes(buf));
+        }
+        return new LeafNode(metadata, pageNum, keys, children, Optional.of(rightSibling), transaction);
+
     }
 
     // Builtins //////////////////////////////////////////////////////////////////

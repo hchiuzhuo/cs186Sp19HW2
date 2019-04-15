@@ -7,6 +7,7 @@ import edu.berkeley.cs186.database.BaseTransaction;
 import edu.berkeley.cs186.database.common.Buffer;
 import edu.berkeley.cs186.database.common.Pair;
 import edu.berkeley.cs186.database.databox.DataBox;
+import edu.berkeley.cs186.database.databox.IntDataBox;
 import edu.berkeley.cs186.database.databox.Type;
 import edu.berkeley.cs186.database.io.Page;
 import edu.berkeley.cs186.database.table.RecordId;
@@ -48,6 +49,7 @@ class InnerNode extends BPlusNode {
         this(metadata, metadata.getAllocator().allocPage(transaction), keys, children, transaction);
     }
 
+
     /**
      * Construct an inner node that is persisted to page `pageNum` allocated by
      * metadata.getAllocator().
@@ -68,20 +70,119 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(BaseTransaction transaction, DataBox key) {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        int i=0;
+//        while( i < keys.size()){
+//            if(key.compareTo(keys.get(i))< 0){
+//                break;
+//            }
+//            i++;
+//        }
+        int idx = numLessThanEqual(key, keys);
+        BPlusNode next = getChild(transaction, idx);
+        return next.get(transaction,key);
+//        try {
+//            InnerNode next = InnerNode.fromBytes(transaction, metadata, children.get(i).intValue());
+//            return next.get(transaction, key);
+//        }catch (AssertionError e) {
+////            System.out.println(key.getInt()+" Arrive Leave node");
+//        }
+
+//        return LeafNode.fromBytes(transaction, metadata, children.get(i).intValue());
+
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf(BaseTransaction transaction) {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        return LeafNode.fromBytes(transaction, metadata, children.get(0).intValue());
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Integer>> put(BaseTransaction transaction, DataBox key, RecordId rid)
     throws BPlusTreeException {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        int idx = numLessThan(key, this.keys);
+        BPlusNode next = getChild(transaction, idx);
+        Optional<Pair<DataBox, Integer>> res = next.put(transaction, key,rid);
+        if(res.isPresent()) {
+            DataBox insertKey = res.get().getFirst();
+            Integer insertChild = res.get().getSecond();
+            int j = 0;
+            while (j < this.keys.size()) {
+                if (insertKey.compareTo(this.keys.get(j)) < 0) {
+                    break;
+                }
+                j++;
+            }
+
+            this.keys.add(j, insertKey);
+            this.children.add(j + 1, insertChild);
+
+            if (this.keys.size() > this.metadata.getOrder() * 2) {
+                InnerNode inner = new InnerNode(this.metadata, this.keys.subList(this.metadata.getOrder() + 1, this.keys.size()),
+                        this.children.subList(this.metadata.getOrder() + 1, this.children.size()), transaction);
+                res = Optional.of(new Pair<>(this.keys.get(this.metadata.getOrder()), inner.getPage().getPageNum()));
+                this.keys = this.keys.subList(0, this.metadata.getOrder());
+                this.children = this.children.subList(0, this.metadata.getOrder() + 1);
+            }else{
+                res = Optional.empty();
+            }
+        }
+        sync(transaction);
+
+
+//        Optional<Pair<DataBox, Integer>> res = Optional.empty();
+//
+//        int i=0;
+//        while( i < keys.size()){
+//            if(key.compareTo(keys.get(i))< 0){
+//                break;
+//            }
+//            i++;
+//        }
+//        try {
+//            InnerNode nxt = InnerNode.fromBytes(transaction, metadata, children.get(i).intValue());
+//            res = nxt.put(transaction, key, rid);
+//        }catch (AssertionError e) {
+//            res = LeafNode.fromBytes(transaction, metadata, children.get(i).intValue()).put(transaction,key,rid);
+//            return res;
+//        }
+//
+//        if(res.isPresent()){
+//            DataBox insertKey = res.get().getFirst();
+//            Integer insertChild = res.get().getSecond();
+//            int j=0;
+//            while (j < this.keys.size()){
+//                if(insertKey.compareTo(this.keys.get(j)) < 0){
+//                    break;
+//                }
+//                j++;
+//            }
+//
+//            this.keys.add(j, insertKey);
+//            this.children.add(j+1, insertChild);
+//            System.out.println("return keys: "+this.keys.toString());
+//
+//            if(this.keys.size() > this.metadata.getOrder()*2) {
+//                InnerNode inner = new InnerNode(this.metadata, this.keys.subList(this.metadata.getOrder() + 1, this.keys.size()),
+//                        this.children.subList(this.metadata.getOrder() + 1, this.children.size()), transaction);
+//                res = Optional.of(new Pair<>(this.keys.get(this.metadata.getOrder()), inner.getPage().getPageNum()));
+//                this.keys = this.keys.subList(0, this.metadata.getOrder());
+//                this.children = this.children.subList(0, this.metadata.getOrder() + 1);
+//
+//            }else{
+//                res = Optional.empty();
+//            }
+//        }
+//        sync(transaction);
+
+
+
+        return res;
+
     }
 
     // See BPlusNode.bulkLoad.
@@ -96,7 +197,8 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.remove.
     @Override
     public void remove(BaseTransaction transaction, DataBox key) {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        get(transaction, key).remove(transaction,key);
     }
 
     // Helpers ///////////////////////////////////////////////////////////////////
@@ -110,7 +212,8 @@ class InnerNode extends BPlusNode {
         return BPlusNode.fromBytes(transaction, metadata, pageNum);
     }
 
-    private void sync(BaseTransaction transaction) {
+
+    public void sync(BaseTransaction transaction) {
         Buffer b = page.getBuffer(transaction);
         byte[] newBytes = toBytes();
         byte[] bytes = new byte[newBytes.length];

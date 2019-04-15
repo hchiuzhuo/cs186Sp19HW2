@@ -168,7 +168,9 @@ public class BPlusTree implements Closeable {
      */
     public Optional<RecordId> get(BaseTransaction transaction, DataBox key) {
         typecheck(key);
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+        LeafNode leaf = this.root.get(transaction,key);
+        return leaf.getKey(key);
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
     }
 
     /**
@@ -262,7 +264,57 @@ public class BPlusTree implements Closeable {
      */
     public void put(BaseTransaction transaction, DataBox key, RecordId rid) throws BPlusTreeException {
         typecheck(key);
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+        Optional<Pair<DataBox, Integer>> rp = this.root.put(transaction,key,rid);
+        if (rp.isPresent()) {
+            DataBox insertKey = rp.get().getFirst();
+            Integer insertChild = rp.get().getSecond();
+            // Inner node
+            List<DataBox> innerKeys = new ArrayList<>();
+            innerKeys.add(insertKey);
+            List<Integer> innerChildren = new ArrayList<>();
+            innerChildren.add(this.root.getPage().getPageNum());
+            innerChildren.add(insertChild);
+            this.root = new InnerNode(this.metadata, innerKeys, innerChildren, transaction);
+        }
+        writeHeader(transaction,this.root.getPage());
+//        } else if(this.root instanceof InnerNode && !rp.equals(Optional.empty())) {
+//            DataBox insertKey = rp.get().getFirst();
+//            Integer insertChild = rp.get().getSecond();
+//            int j = 0;
+//            while (j < ((InnerNode) this.root).getKeys().size()) {
+//                if (insertKey.compareTo(((InnerNode) this.root).getKeys().get(j)) < 0) {
+//                    break;
+//                }
+//                j++;
+//            }
+//            ((InnerNode) this.root).getKeys().add(j, insertKey);
+//            ((InnerNode) this.root).getChildren().add(j + 1, insertChild);
+//            System.out.println("root key"+((InnerNode) this.root).getKeys());
+//            System.out.println("root children"+((InnerNode) this.root).getChildren());
+//
+//            if (((InnerNode) this.root).getKeys().size() > this.metadata.getOrder() * 2) {
+//                InnerNode inner = new InnerNode(this.metadata, ((InnerNode) this.root).getKeys().subList(this.metadata.getOrder() + 1, ((InnerNode) this.root).getKeys().size()),
+//                        ((InnerNode) this.root).getChildren().subList(this.metadata.getOrder() + 1, ((InnerNode) this.root).getChildren().size()), transaction);
+//
+//                List<DataBox> innerKeys = new ArrayList<>();
+//                innerKeys.add(((InnerNode) this.root).getKeys().get(this.metadata.getOrder()));
+//                List<Integer> innerChildren = new ArrayList<>();
+//                innerChildren.add(this.root.getPage().getPageNum());
+//                innerChildren.add(inner.getPage().getPageNum());
+//
+//                ((InnerNode) this.root).setKeys(((InnerNode) this.root).getKeys().subList(0, this.metadata.getOrder()));
+//                ((InnerNode) this.root).setChildren(((InnerNode) this.root).getChildren().subList(0, this.metadata.getOrder() + 1));
+//                System.out.println("left: "+ ((InnerNode) this.root).getKeys() + ((InnerNode) this.root).getChildren());
+//
+//                System.out.println("right: "+ inner.getKeys()+inner.getChildren());
+//                ((InnerNode) this.root).sync(transaction);
+//                this.root = new InnerNode(this.metadata, innerKeys, innerChildren, transaction);
+//
+//            }
+
+//        }
+
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
     }
 
     /**
