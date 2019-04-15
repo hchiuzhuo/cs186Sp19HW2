@@ -371,19 +371,19 @@ public class TestBPlusTree {
                     assertEquals(Optional.of(rids.get(i)), tree.get(null, keys.get(i)));
                 }
 
-//                // Test scanAll.
-//                assertEquals(sortedRids, iteratorToList(tree.scanAll(null)));
-//
-//                // Test scanGreaterEqual.
-//                for (int i = 0; i < keys.size(); i += 100) {
-//                    Iterator<RecordId> actual = tree.scanGreaterEqual(null, new IntDataBox(i));
-//                    List<RecordId> expected = sortedRids.subList(i, sortedRids.size());
-//                    assertEquals(expected, iteratorToList(actual));
-//                }
-//
-//                // Load the tree from disk.
-//                BPlusTree fromDisk = new BPlusTree(file.getAbsolutePath(), new DummyLockContext(), null);
-//                assertEquals(sortedRids, iteratorToList(fromDisk.scanAll(null)));
+                // Test scanAll.
+                assertEquals(sortedRids, iteratorToList(tree.scanAll(null)));
+
+                // Test scanGreaterEqual.
+                for (int i = 0; i < keys.size(); i += 100) {
+                    Iterator<RecordId> actual = tree.scanGreaterEqual(null, new IntDataBox(i));
+                    List<RecordId> expected = sortedRids.subList(i, sortedRids.size());
+                    assertEquals(expected, iteratorToList(actual));
+                }
+
+                // Load the tree from disk.
+                BPlusTree fromDisk = new BPlusTree(file.getAbsolutePath(), new DummyLockContext(), null);
+                assertEquals(sortedRids, iteratorToList(fromDisk.scanAll(null)));
 //
 //                // Test remove.
 //                Collections.shuffle(keys, new Random(42));

@@ -161,13 +161,14 @@ class LeafNode extends BPlusNode {
         this.rids.add(addIdx, rid);
         //if overflow, split
         if(this.keys.size() > this.metadata.getOrder()*2){
-
+//            Note: right sibling should update w.t. current right sibling
             LeafNode leaf1 = new LeafNode(this.metadata, this.keys.subList(this.metadata.getOrder(), this.keys.size()),
-                                          this.rids.subList(this.metadata.getOrder(), this.rids.size()), Optional.empty(), transaction);
+                                          this.rids.subList(this.metadata.getOrder(), this.rids.size()), this.rightSibling, transaction);
             this.keys = this.keys.subList(0, this.metadata.getOrder());
             this.rids = this.rids.subList(0, this.metadata.getOrder());
-            this.rightSibling = Optional.of(leaf1.getPage().getPageNum());
+
             res = Optional.of(new Pair<>(leaf1.keys.get(0), leaf1.getPage().getPageNum()));
+            this.rightSibling = Optional.of(leaf1.getPage().getPageNum());
 
         }
 
@@ -334,7 +335,7 @@ class LeafNode extends BPlusNode {
             String rid = rids.get(i).toSexp();
             ss.add(String.format("(%s %s)", key, rid));
         }
-        return String.format("(%s)", String.join(" ", ss));
+        return String.format(" (%s)", String.join(" ", ss));
     }
 
     /**

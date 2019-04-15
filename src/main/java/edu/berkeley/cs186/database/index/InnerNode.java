@@ -70,24 +70,10 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(BaseTransaction transaction, DataBox key) {
-//        int i=0;
-//        while( i < keys.size()){
-//            if(key.compareTo(keys.get(i))< 0){
-//                break;
-//            }
-//            i++;
-//        }
+
         int idx = numLessThanEqual(key, keys);
         BPlusNode next = getChild(transaction, idx);
         return next.get(transaction,key);
-//        try {
-//            InnerNode next = InnerNode.fromBytes(transaction, metadata, children.get(i).intValue());
-//            return next.get(transaction, key);
-//        }catch (AssertionError e) {
-////            System.out.println(key.getInt()+" Arrive Leave node");
-//        }
-
-//        return LeafNode.fromBytes(transaction, metadata, children.get(i).intValue());
 
 //        throw new UnsupportedOperationException("TODO(hw2): implement");
     }
@@ -96,7 +82,12 @@ class InnerNode extends BPlusNode {
     @Override
     public LeafNode getLeftmostLeaf(BaseTransaction transaction) {
 //        throw new UnsupportedOperationException("TODO(hw2): implement");
-        return LeafNode.fromBytes(transaction, metadata, children.get(0).intValue());
+//        return LeafNode.fromBytes(transaction, metadata, children.get(0).intValue());
+        BPlusNode next = getChild(transaction,0);
+        while(next instanceof InnerNode){
+            next = ((InnerNode) next).getChild(transaction,0);
+        }
+        return (LeafNode)next;
     }
 
     // See BPlusNode.put.
@@ -110,16 +101,9 @@ class InnerNode extends BPlusNode {
         if(res.isPresent()) {
             DataBox insertKey = res.get().getFirst();
             Integer insertChild = res.get().getSecond();
-            int j = 0;
-            while (j < this.keys.size()) {
-                if (insertKey.compareTo(this.keys.get(j)) < 0) {
-                    break;
-                }
-                j++;
-            }
-
-            this.keys.add(j, insertKey);
-            this.children.add(j + 1, insertChild);
+            int insert_idx = numLessThan(key, this.keys);
+            this.keys.add(insert_idx, insertKey);
+            this.children.add(insert_idx + 1, insertChild);
 
             if (this.keys.size() > this.metadata.getOrder() * 2) {
                 InnerNode inner = new InnerNode(this.metadata, this.keys.subList(this.metadata.getOrder() + 1, this.keys.size()),
@@ -136,6 +120,7 @@ class InnerNode extends BPlusNode {
 
 //        Optional<Pair<DataBox, Integer>> res = Optional.empty();
 //
+//        Note: numLessThan already implment the while loop.
 //        int i=0;
 //        while( i < keys.size()){
 //            if(key.compareTo(keys.get(i))< 0){
@@ -143,6 +128,9 @@ class InnerNode extends BPlusNode {
 //            }
 //            i++;
 //        }
+//        Note: use BPlusNode next = getChild(transaction, idx) to replace this ugly try catch. in addition,
+//        this try catch recursive iteration won't return result to current node.
+//        because: current node -> nxt inner node -> assertion error -> leafnode -> return res to current node. the nxt innernode won't exit on the recuresive path.
 //        try {
 //            InnerNode nxt = InnerNode.fromBytes(transaction, metadata, children.get(i).intValue());
 //            res = nxt.put(transaction, key, rid);
