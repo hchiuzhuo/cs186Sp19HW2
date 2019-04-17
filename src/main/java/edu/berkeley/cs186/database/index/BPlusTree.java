@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.FileWriter;
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.util.*;
 
 import edu.berkeley.cs186.database.BaseTransaction;
@@ -268,8 +269,10 @@ public class BPlusTree implements Closeable {
      */
     public void put(BaseTransaction transaction, DataBox key, RecordId rid) throws BPlusTreeException {
         typecheck(key);
+
         Optional<Pair<DataBox, Integer>> rp = this.root.put(transaction,key,rid);
         if (rp.isPresent()) {
+
             DataBox insertKey = rp.get().getFirst();
             Integer insertChild = rp.get().getSecond();
             // Inner node
@@ -279,9 +282,9 @@ public class BPlusTree implements Closeable {
             innerChildren.add(this.root.getPage().getPageNum());
             innerChildren.add(insertChild);
             this.root = new InnerNode(this.metadata, innerKeys, innerChildren, transaction);
+//            should sync header page
+            writeHeader(transaction,this.headerPage);
         }
-        writeHeader(transaction,this.root.getPage());
-
 //        throw new UnsupportedOperationException("TODO(hw2): implement");
     }
 
@@ -302,7 +305,24 @@ public class BPlusTree implements Closeable {
      */
     public void bulkLoad(BaseTransaction transaction, Iterator<Pair<DataBox, RecordId>> data,
                          float fillFactor) throws BPlusTreeException {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        Optional<Pair<DataBox, Integer>>  rp = this.root.bulkLoad(transaction,data,fillFactor);
+
+        while(rp.isPresent() || data.hasNext()) {
+            DataBox insertKey = rp.get().getFirst();
+            Integer insertChild = rp.get().getSecond();
+            // Inner node
+            List<DataBox> innerKeys = new ArrayList<>();
+            innerKeys.add(insertKey);
+            List<Integer> innerChildren = new ArrayList<>();
+            innerChildren.add(this.root.getPage().getPageNum());
+            innerChildren.add(insertChild);
+            this.root = new InnerNode(this.metadata, innerKeys, innerChildren, transaction);
+//            should sync header page
+            writeHeader(transaction,this.headerPage);
+            rp = this.root.bulkLoad(transaction,data,fillFactor);
+        }
+
     }
 
     /**
@@ -319,7 +339,10 @@ public class BPlusTree implements Closeable {
      */
     public void remove(BaseTransaction transaction, DataBox key) {
         typecheck(key);
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        this.root.remove(transaction,key);
+        LeafNode leaf = this.root.get(transaction,key);
+        leaf.remove(transaction,key);
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
     }
 
     // Helpers /////////////////////////////////////////////////////////////////

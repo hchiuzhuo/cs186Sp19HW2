@@ -146,35 +146,25 @@ class LeafNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Integer>> put(BaseTransaction transaction, DataBox key, RecordId rid)
     throws BPlusTreeException {
-//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        //throw new UnsupportedOperationException("TODO(hw2): implement");
         Optional<Pair<DataBox, Integer>> res = Optional.empty();
         if(!this.getKey(key).equals(Optional.empty())) throw new BPlusTreeException("Duplicated key");
-        int addIdx=this.keys.size();
 
-        for(int i = 0; i < this.keys.size(); i++){
-            if(key.compareTo(this.keys.get(i)) < 0){
-                addIdx = i;
-                break;
-            }
-        }
+        int addIdx = InnerNode.numLessThan(key, this.keys);
         this.keys.add(addIdx, key);
         this.rids.add(addIdx, rid);
         //if overflow, split
         if(this.keys.size() > this.metadata.getOrder()*2){
-//            Note: right sibling should update w.t. current right sibling
+        //Note: right sibling should update w.t. current right sibling
             LeafNode leaf1 = new LeafNode(this.metadata, this.keys.subList(this.metadata.getOrder(), this.keys.size()),
                                           this.rids.subList(this.metadata.getOrder(), this.rids.size()), this.rightSibling, transaction);
             this.keys = this.keys.subList(0, this.metadata.getOrder());
             this.rids = this.rids.subList(0, this.metadata.getOrder());
-
             res = Optional.of(new Pair<>(leaf1.keys.get(0), leaf1.getPage().getPageNum()));
             this.rightSibling = Optional.of(leaf1.getPage().getPageNum());
-
         }
-
         sync(transaction);
         return res;
-
     }
 
     // See BPlusNode.bulkLoad.
@@ -188,26 +178,20 @@ class LeafNode extends BPlusNode {
         int splitLen = (int) Math.ceil(2 * this.metadata.getOrder() * fillFactor) ;
 
         DataBox key;
-        TreeMap sortedData = new TreeMap();
-        Pair<DataBox, RecordId> entry;
         while (data.hasNext()){
-            entry = data.next();
-            if(sortedData.containsKey(entry.getFirst())) throw new BPlusTreeException("Duplicated key");
-            sortedData.put(entry.getFirst(), entry.getSecond());
-        }
-        Iterator sortedDataItr = sortedData.entrySet().iterator();
-        while (sortedDataItr.hasNext()){
-            Map.Entry ent = (Map.Entry)sortedDataItr.next();
-            if(this.keys.size() <= splitLen){
-                this.keys.add((DataBox) ent.getKey());
-                this.rids.add((RecordId) ent.getValue());
+            Pair<DataBox, RecordId> ent = data.next();
+            if(this.keys.size() < splitLen){
+                this.keys.add(ent.getFirst());
+                this.rids.add(ent.getSecond());
             }else{
-                LeafNode leaf1 = new LeafNode(this.metadata, this.keys.subList(0, splitLen), this.rids.subList(0, splitLen), Optional.of(this.getPage().getPageNum()), transaction);
-                this.keys = new ArrayList<>();
-                this.rids = new ArrayList<>();
-                this.keys.add((DataBox) ent.getKey());
-                this.rids.add((RecordId) ent.getValue());
-                res = Optional.of(new Pair<>((DataBox) ent.getKey(), this.getPage().getPageNum()));
+
+                LeafNode leaf1 = new LeafNode(this.metadata, new ArrayList<>(Arrays.asList((DataBox) ent.getFirst())),
+                        new ArrayList<>(Arrays.asList((RecordId) ent.getSecond())),this.rightSibling, transaction);
+                this.keys = this.keys.subList(0, splitLen);
+                this.rids = this.rids.subList(0, splitLen);
+                res = Optional.of(new Pair<>(leaf1.keys.get(0), leaf1.getPage().getPageNum()));
+                this.rightSibling = Optional.of(leaf1.getPage().getPageNum());
+                break;
             }
         }
         sync(transaction);
@@ -335,7 +319,7 @@ class LeafNode extends BPlusNode {
             String rid = rids.get(i).toSexp();
             ss.add(String.format("(%s %s)", key, rid));
         }
-        return String.format(" (%s)", String.join(" ", ss));
+        return String.format("(%s)", String.join(" ", ss));
     }
 
     /**

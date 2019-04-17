@@ -70,19 +70,18 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(BaseTransaction transaction, DataBox key) {
-
         int idx = numLessThanEqual(key, keys);
         BPlusNode next = getChild(transaction, idx);
         return next.get(transaction,key);
-
-//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        //throw new UnsupportedOperationException("TODO(hw2): implement");
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf(BaseTransaction transaction) {
-//        throw new UnsupportedOperationException("TODO(hw2): implement");
-//        return LeafNode.fromBytes(transaction, metadata, children.get(0).intValue());
+        //throw new UnsupportedOperationException("TODO(hw2): implement");
+        //Note: cannot directly return leaf node, must to consider about the internal inner node whose children can be innernode as well
+        //return LeafNode.fromBytes(transaction, metadata, children.get(0).intValue());
         BPlusNode next = getChild(transaction,0);
         while(next instanceof InnerNode){
             next = ((InnerNode) next).getChild(transaction,0);
@@ -95,13 +94,13 @@ class InnerNode extends BPlusNode {
     public Optional<Pair<DataBox, Integer>> put(BaseTransaction transaction, DataBox key, RecordId rid)
     throws BPlusTreeException {
 //        throw new UnsupportedOperationException("TODO(hw2): implement");
-        int idx = numLessThan(key, this.keys);
+        int idx = numLessThanEqual(key, this.keys);
         BPlusNode next = getChild(transaction, idx);
         Optional<Pair<DataBox, Integer>> res = next.put(transaction, key,rid);
         if(res.isPresent()) {
             DataBox insertKey = res.get().getFirst();
             Integer insertChild = res.get().getSecond();
-            int insert_idx = numLessThan(key, this.keys);
+            int insert_idx = numLessThanEqual(insertKey, this.keys);
             this.keys.add(insert_idx, insertKey);
             this.children.add(insert_idx + 1, insertChild);
 
@@ -167,8 +166,6 @@ class InnerNode extends BPlusNode {
 //        }
 //        sync(transaction);
 
-
-
         return res;
 
     }
@@ -179,7 +176,30 @@ class InnerNode extends BPlusNode {
             Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor)
     throws BPlusTreeException {
-        throw new UnsupportedOperationException("TODO(hw2): implement");
+//        throw new UnsupportedOperationException("TODO(hw2): implement");
+        LeafNode next = get(transaction,this.keys.get(this.keys.size()-1));
+        Optional<Pair<DataBox, Integer>> res = next.bulkLoad(transaction,data,fillFactor);
+        while(res.isPresent() || data.hasNext()){
+            DataBox insertKey = res.get().getFirst();
+            Integer insertChild = res.get().getSecond();
+            this.keys.add(insertKey);
+            this.children.add(insertChild);
+
+            if (this.keys.size() > (this.metadata.getOrder()*2)) {
+                InnerNode inner = new InnerNode(this.metadata, this.keys.subList(this.metadata.getOrder() + 1, this.keys.size()),
+                        this.children.subList(this.metadata.getOrder() + 1, this.children.size()), transaction);
+                res = Optional.of(new Pair<>(this.keys.get(this.metadata.getOrder()), inner.getPage().getPageNum()));
+                this.keys = this.keys.subList(0, this.metadata.getOrder());
+                this.children = this.children.subList(0, this.metadata.getOrder() + 1);
+                break;
+            }else{
+                //get the rightest child
+                next = get(transaction,this.keys.get(this.keys.size()-1));
+                res = next.bulkLoad(transaction,data,fillFactor);
+            }
+        }
+        sync(transaction);
+        return res;
     }
 
     // See BPlusNode.remove.
@@ -187,6 +207,7 @@ class InnerNode extends BPlusNode {
     public void remove(BaseTransaction transaction, DataBox key) {
 //        throw new UnsupportedOperationException("TODO(hw2): implement");
         get(transaction, key).remove(transaction,key);
+        sync(transaction);
     }
 
     // Helpers ///////////////////////////////////////////////////////////////////
